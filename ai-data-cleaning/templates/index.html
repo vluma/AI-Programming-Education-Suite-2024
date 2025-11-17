@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FatigueSet 数据浏览器</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .sidebar {
+            min-height: 100vh;
+            background-color: #f8f9fa;
+            border-right: 1px solid #dee2e6;
+        }
+        .main-content {
+            padding: 20px;
+        }
+        .sensor-card {
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .sensor-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .data-table {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+        }
+        .stats-card .card-body {
+            padding: 1.5rem;
+        }
+        .stats-number {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        .participant-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            margin: 0.125rem;
+            border-radius: 0.25rem;
+            background-color: #e9ecef;
+            cursor: pointer;
+        }
+        .participant-badge:hover {
+            background-color: #dee2e6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- 侧边栏 -->
+            <div class="col-md-3 sidebar">
+                <div class="p-3">
+                    <h4 class="text-center mb-4">
+                        <i class="bi bi-graph-up"></i> FatigueSet 数据浏览器
+                    </h4>
+                    
+                    <!-- 统计信息 -->
+                    <div id="stats-container" class="mb-4">
+                        <div class="loading">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">加载中...</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 导航菜单 -->
+                    <div class="nav flex-column">
+                        <a class="nav-link active" href="#overview" data-bs-toggle="pill">
+                            <i class="bi bi-house"></i> 总览
+                        </a>
+                        <a class="nav-link" href="#participants" data-bs-toggle="pill">
+                            <i class="bi bi-people"></i> 参与者
+                        </a>
+                        <a class="nav-link" href="#sensors" data-bs-toggle="pill">
+                            <i class="bi bi-cpu"></i> 传感器
+                        </a>
+                        <a class="nav-link" href="#data" data-bs-toggle="pill">
+                            <i class="bi bi-table"></i> 数据浏览
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 主内容区 -->
+            <div class="col-md-9 main-content">
+                <div class="tab-content">
+                    <!-- 总览页面 -->
+                    <div class="tab-pane fade show active" id="overview">
+                        <h2 class="mb-4">FatigueSet 数据集总览</h2>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="card stats-card">
+                                    <div class="card-body text-center">
+                                        <i class="bi bi-people-fill fs-1 mb-2"></i>
+                                        <div class="stats-number" id="total-participants">-</div>
+                                        <div>总参与者数</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card stats-card">
+                                    <div class="card-body text-center">
+                                        <i class="bi bi-cpu-fill fs-1 mb-2"></i>
+                                        <div class="stats-number" id="total-sensors">-</div>
+                                        <div>传感器类型</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card stats-card">
+                                    <div class="card-body text-center">
+                                        <i class="bi bi-database-fill fs-1 mb-2"></i>
+                                        <div class="stats-number" id="total-records">-</div>
+                                        <div>数据记录数</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-5">
+                            <h4>数据集说明</h4>
+                            <p>FatigueSet 是一个多模态数据集，用于建模精神疲劳和疲劳性。该数据集包含来自四个可穿戴设备的生理传感器数据：</p>
+                            <ul>
+                                <li><strong>Nokia Bell Labs eSense 耳戴式传感器</strong> - 加速度计、陀螺仪、PPG传感器</li>
+                                <li><strong>Muse S 头带</strong> - EEG脑电图、加速度计、陀螺仪</li>
+                                <li><strong>Zephyr BioHarness 3.0 胸部监护仪</strong> - ECG心电图、呼吸、加速度计</li>
+                                <li><strong>Empatica E4 手环</strong> - 心率、皮肤电活动、温度、加速度计</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <!-- 参与者页面 -->
+                    <div class="tab-pane fade" id="participants">
+                        <h2 class="mb-4">参与者信息</h2>
+                        <div id="participants-container">
+                            <div class="loading">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">加载中...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 传感器页面 -->
+                    <div class="tab-pane fade" id="sensors">
+                        <h2 class="mb-4">传感器类型</h2>
+                        <div id="sensors-container">
+                            <div class="loading">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">加载中...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 数据浏览页面 -->
+                    <div class="tab-pane fade" id="data">
+                        <h2 class="mb-4">数据浏览</h2>
+                        
+                        <!-- 筛选控件 -->
+                        <div class="row mb-4">
+                            <div class="col-md-4">
+                                <label for="sensor-select" class="form-label">选择传感器</label>
+                                <select class="form-select" id="sensor-select">
+                                    <option value="">请选择传感器...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="participant-select" class="form-label">参与者</label>
+                                <select class="form-select" id="participant-select">
+                                    <option value="">全部参与者</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="session-select" class="form-label">会话</label>
+                                <select class="form-select" id="session-select">
+                                    <option value="">全部会话</option>
+                                    <option value="1">会话 1</option>
+                                    <option value="2">会话 2</option>
+                                    <option value="3">会话 3</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">&nbsp;</label>
+                                <button class="btn btn-primary w-100" onclick="loadSensorData()">
+                                    <i class="bi bi-search"></i> 查询
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- 数据展示区域 -->
+                        <div id="data-container">
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i> 请选择传感器类型以查看数据
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 参与者详情模态框 -->
+    <div class="modal fade" id="participantModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">参与者详情</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="participant-details">
+                    <div class="loading">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">加载中...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 全局变量
+        let participants = [];
+        let sensors = [];
+        
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStats();
+            loadParticipants();
+            loadSensors();
+        });
+        
+        // 加载统计信息
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const stats = await response.json();
+                
+                document.getElementById('total-participants').textContent = stats.total_participants;
+                document.getElementById('total-sensors').textContent = stats.total_sensor_types;
+                
+                // 计算总记录数
+                let totalRecords = 0;
+                if (stats.sensor_stats) {
+                    stats.sensor_stats.forEach(sensor => {
+                        totalRecords += sensor.record_count;
+                    });
+                }
+                document.getElementById('total-records').textContent = totalRecords.toLocaleString();
+                
+            } catch (error) {
+                console.error('加载统计信息失败:', error);
+            }
+        }
+        
+        // 加载参与者列表
+        async function loadParticipants() {
+            try {
+                const response = await fetch('/api/participants');
+                participants = await response.json();
+                
+                let html = '<div class="row">';
+                participants.forEach(participant => {
+                    html += `
+                        <div class="col-md-4 mb-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">参与者 ${participant.participant_id}</h5>
+                                    <p class="card-text">
+                                        <small class="text-muted">
+                                            低强度: 会话${participant.low_session} | 
+                                            中强度: 会话${participant.medium_session} | 
+                                            高强度: 会话${participant.high_session}
+                                        </small>
+                                    </p>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="showParticipantDetails('${participant.participant_id}')">
+                                        <i class="bi bi-eye"></i> 查看详情
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                
+                document.getElementById('participants-container').innerHTML = html;
+                
+                // 更新参与者选择器
+                updateParticipantSelect();
+                
+            } catch (error) {
+                console.error('加载参与者列表失败:', error);
+            }
+        }
+        
+        // 加载传感器列表
+        async function loadSensors() {
+            try {
+                const response = await fetch('/api/sensors');
+                sensors = await response.json();
+                
+                let html = '<div class="row">';
+                sensors.forEach(sensor => {
+                    html += `
+                        <div class="col-md-6 mb-3">
+                            <div class="card sensor-card" onclick="showSensorDetails('${sensor.sensor_name}')">
+                                <div class="card-body">
+                                    <h5 class="card-title">${sensor.sensor_name}</h5>
+                                    <p class="card-text">${sensor.description}</p>
+                                    <div class="d-flex justify-content-between text-muted small">
+                                        <span><i class="bi bi-speedometer2"></i> ${sensor.sampling_rate}</span>
+                                        <span><i class="bi bi-tag"></i> ${sensor.sensor_type}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                
+                document.getElementById('sensors-container').innerHTML = html;
+                
+                // 更新传感器选择器
+                updateSensorSelect();
+                
+            } catch (error) {
+                console.error('加载传感器列表失败:', error);
+            }
+        }
+        
+        // 更新传感器选择器
+        function updateSensorSelect() {
+            const select = document.getElementById('sensor-select');
+            select.innerHTML = '<option value="">请选择传感器...</option>';
+            sensors.forEach(sensor => {
+                select.innerHTML += `<option value="${sensor.sensor_name}">${sensor.sensor_name} - ${sensor.description}</option>`;
+            });
+        }
+        
+        // 更新参与者选择器
+        function updateParticipantSelect() {
+            const select = document.getElementById('participant-select');
+            select.innerHTML = '<option value="">全部参与者</option>';
+            participants.forEach(participant => {
+                select.innerHTML += `<option value="${participant.participant_id}">参与者 ${participant.participant_id}</option>`;
+            });
+        }
+        
+        // 显示参与者详情
+        async function showParticipantDetails(participantId) {
+            try {
+                const response = await fetch(`/api/participant/${participantId}/overview`);
+                const data = await response.json();
+                
+                let html = `
+                    <h5>参与者 ${data.participant_id}</h5>
+                    <p><strong>会话安排:</strong></p>
+                    <ul>
+                        <li>低强度活动: 会话 ${data.participant_info.low_session}</li>
+                        <li>中强度活动: 会话 ${data.participant_info.medium_session}</li>
+                        <li>高强度活动: 会话 ${data.participant_info.high_session}</li>
+                    </ul>
+                    <h6>可用传感器数据:</h6>
+                `;
+                
+                if (data.sensor_stats && data.sensor_stats.length > 0) {
+                    html += '<div class="table-responsive"><table class="table table-sm">';
+                    html += '<thead><tr><th>传感器</th><th>描述</th><th>会话1</th><th>会话2</th><th>会话3</th></tr></thead>';
+                    html += '<tbody>';
+                    
+                    data.sensor_stats.forEach(sensor => {
+                        html += `<tr><td>${sensor.sensor_name}</td><td>${sensor.description}</td>`;
+                        
+                        // 为每个会话显示记录数
+                        for (let session = 1; session <= 3; session++) {
+                            const sessionData = sensor.session_stats.find(s => s.session_id == session);
+                            html += `<td>${sessionData ? sessionData.record_count : 0}</td>`;
+                        }
+                        html += '</tr>';
+                    });
+                    
+                    html += '</tbody></table></div>';
+                } else {
+                    html += '<p class="text-muted">暂无传感器数据</p>';
+                }
+                
+                document.getElementById('participant-details').innerHTML = html;
+                
+                // 显示模态框
+                const modal = new bootstrap.Modal(document.getElementById('participantModal'));
+                modal.show();
+                
+            } catch (error) {
+                console.error('加载参与者详情失败:', error);
+                document.getElementById('participant-details').innerHTML = '<div class="alert alert-danger">加载失败</div>';
+            }
+        }
+        
+        // 显示传感器详情
+        async function showSensorDetails(sensorName) {
+            // 切换到数据浏览标签页
+            const dataTab = new bootstrap.Tab(document.querySelector('[data-bs-target="#data"]'));
+            dataTab.show();
+            
+            // 设置传感器选择器
+            document.getElementById('sensor-select').value = sensorName;
+            
+            // 加载数据
+            loadSensorData();
+        }
+        
+        // 加载传感器数据
+        async function loadSensorData() {
+            const sensorName = document.getElementById('sensor-select').value;
+            const participantId = document.getElementById('participant-select').value;
+            const sessionId = document.getElementById('session-select').value;
+            
+            if (!sensorName) {
+                document.getElementById('data-container').innerHTML = '<div class="alert alert-info"><i class="bi bi-info-circle"></i> 请选择传感器类型</div>';
+                return;
+            }
+            
+            document.getElementById('data-container').innerHTML = '<div class="loading"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">加载中...</span></div></div>';
+            
+            try {
+                // 构建查询参数
+                let url = `/api/sensor/${sensorName}/data?limit=100`;
+                if (participantId) url += `&participant_id=${participantId}`;
+                if (sessionId) url += `&session_id=${sessionId}`;
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.error) {
+                    document.getElementById('data-container').innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                    return;
+                }
+                
+                // 显示数据摘要
+                let html = `
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle"></i> 找到 ${data.total_records} 条记录
+                    </div>
+                    <div class="table-responsive data-table">
+                        <table class="table table-striped table-sm">
+                            <thead>
+                                <tr>
+                `;
+                
+                // 表头
+                data.columns.forEach(column => {
+                    html += `<th>${column}</th>`;
+                });
+                html += '</tr></thead><tbody>';
+                
+                // 数据行
+                data.data.forEach(record => {
+                    html += '<tr>';
+                    data.columns.forEach(column => {
+                        let value = record[column];
+                        if (typeof value === 'number' && value !== Math.floor(value)) {
+                            value = value.toFixed(3);
+                        }
+                        html += `<td>${value}</td>`;
+                    });
+                    html += '</tr>';
+                });
+                
+                html += '</tbody></table></div>';
+                
+                document.getElementById('data-container').innerHTML = html;
+                
+            } catch (error) {
+                console.error('加载传感器数据失败:', error);
+                document.getElementById('data-container').innerHTML = '<div class="alert alert-danger">加载失败</div>';
+            }
+        }
+    </script>
+</body>
+</html>
